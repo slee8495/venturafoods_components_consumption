@@ -1,0 +1,313 @@
+library(tidyverse)
+library(magrittr)
+library(openxlsx)
+library(readxl)
+library(writexl)
+library(reshape2)
+library(skimr)
+library(janitor)
+library(lubridate)
+
+
+# Forecast dsx (for lag1, use the first day of the month) ----
+# Make sure to put the date correctly few below ----
+dsx <- read_excel("S:/Global Shared Folders/Large Documents/S&OP/Demand Planning/Demand Planning Team/BI Forecast Backup/2022/DSX Forecast Backup - 2022.08.01.xlsx")
+
+dsx[-1, ] -> dsx
+colnames(dsx) <- dsx[1, ]
+dsx[-1, ] -> dsx
+
+dsx %>% 
+  janitor::clean_names() %>% 
+  readr::type_convert() %>% 
+  data.frame() %>% 
+  dplyr::filter(forecast_month_year_code == 202208) %>%    ############################# MAKE SURE TO PUT THE DATE CORRECTLY ####################### ----
+  dplyr::rename(mfg_loc = product_manufacturing_location_code,
+                location = location_no,
+                sku = product_label_sku_code,
+                sku_description = product_label_sku_name,
+                category = product_category_name,
+                platform = product_platform_name,
+                group_no = product_group_code,
+                group = product_group_short_name) %>% 
+  dplyr::mutate(sku = gsub("-", "", sku),
+                ref = paste0(location, "_", sku),
+                mfg_ref = paste0(mfg_loc, "_", sku),
+                label = stringr::str_sub(sku, 6, 8)) %>% 
+  dplyr::select(mfg_ref, mfg_loc, sku, sku_description, label, category, platform, group_no, group, adjusted_forecast_cases,
+                adjusted_forecast_pounds_lbs) %>% 
+  dplyr::mutate(adjusted_forecast_pounds_lbs = replace(adjusted_forecast_pounds_lbs, is.na(adjusted_forecast_pounds_lbs), 0),
+                adjusted_forecast_cases = replace(adjusted_forecast_cases, is.na(adjusted_forecast_cases), 0)) -> forecast 
+
+
+forecast %>% 
+  dplyr::group_by(mfg_ref, mfg_loc, sku, sku_description, label, category, platform, group_no, group) %>% 
+  dplyr::summarise(adjusted_forecast_cases = sum(adjusted_forecast_cases),
+                   adjusted_forecast_pounds_lbs = sum(adjusted_forecast_pounds_lbs)) -> forecast
+
+
+
+# BoM RM to sku ----
+rm_to_sku <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
+                        sheet = "RM to SKU")
+
+rm_to_sku %>% 
+  janitor::clean_names() %>% 
+  readr::type_convert() %>% 
+  dplyr::select(2:4) %>%
+  dplyr::rename(component = comp_number_labor_code,
+                comp_description = comp_description_3,
+                sku = parent_item_number) %>% 
+  dplyr::filter(!is.na(component)) -> rm_to_sku
+
+
+# BoM Report ----
+bom <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
+                  sheet = "BoM")
+
+bom[-1:-5, ] -> bom
+colnames(bom) <- bom[1, ]
+bom[-1, ] -> bom
+
+bom %>% 
+  janitor::clean_names() %>% 
+  readr::type_convert() %>% 
+  data.frame() %>% 
+  dplyr::mutate(ref = gsub("-", "_", ref)) %>% 
+  dplyr::select(ref, comp_ref, business_unit, parent_item_number, comp_number_labor_code, comp_description, quantity_w_scrap) %>% 
+  dplyr::rename(mfg_loc = business_unit,
+                sku = parent_item_number,
+                component = comp_number_labor_code) %>% 
+  dplyr::mutate(mfg_ref = paste0(mfg_loc, "_", sku),
+                mfg_comp_ref = paste0(mfg_loc, "_", component)) %>% 
+  dplyr::relocate(ref, comp_ref, mfg_ref, mfg_comp_ref, sku, component, quantity_w_scrap) -> bom
+
+
+
+########################## actual sales & open orders ############################
+
+# Open order cases (make sure with your date range) 
+# https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/B226EB613542F97E70A294AB6D55B803/K53--K46
+# oil consumption tab in MS
+
+
+## open orders ----
+open_order <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Open Orders - 1 Month (11).xlsx")
+
+open_order[-1, ] -> open_order
+colnames(open_order) <- open_order[1, ]
+open_order[-1, ] -> open_order
+
+open_order %>% 
+  janitor::clean_names() %>% 
+  readr::type_convert() %>% 
+  dplyr::rename(location_name = na,
+                mfg_loc = product_manufacturing_location,
+                mfg_loc_name = na_2,
+                component = base_product,
+                sku = product_label_sku,
+                description = na_3,
+                category = na_4,
+                category_no = product_category,
+                open_order_net_lbs = oo_net_pounds_lbs,
+                open_order_cases = oo_cases) %>% 
+  dplyr::mutate(sales_order_requested_ship_date = as.Date(sales_order_requested_ship_date, origin = "1899-12-30"),
+                open_order_cases = replace(open_order_cases, is.na(open_order_cases), 0),
+                sku = gsub("-", "", sku), 
+                ref = paste0(location, "_", sku),
+                mfg_ref = paste0(mfg_loc, "_", sku)) %>%
+  dplyr::relocate(ref, mfg_ref) %>%
+  dplyr::relocate(mfg_loc, .after = location) -> open_order
+
+open_order %>% 
+  dplyr::group_by(mfg_ref) %>% 
+  dplyr::summarise(open_order_net_lbs = sum(open_order_net_lbs),
+                   open_order_cases = sum(open_order_cases)) %>% 
+  dplyr::mutate(open_order_net_lbs = replace(open_order_net_lbs, is.na(open_order_net_lbs), 0),
+                open_order_cases = replace(open_order_cases, is.na(open_order_cases), 0)) -> open_order_pivot
+
+
+# Sku Actual Shipped (make sure with your date range)
+# https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/BBAA886ACF43D82757EE568F91EEB679/K53--K46
+
+## sku_actual ----
+sku_actual <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Sku Actual Shipped.xlsx")
+
+sku_actual[-1, ] -> sku_actual
+colnames(sku_actual) <- sku_actual[1, ]
+sku_actual[-1, ] -> sku_actual
+
+sku_actual %>% 
+  janitor::clean_names() %>% 
+  readr::type_convert() %>% 
+  dplyr::rename(location_name = na,
+                mfg_loc = product_manufacturing_location,
+                mfg_loc_name = na_2,
+                component = base_product,
+                description = na_3,
+                sku = product_label_sku,
+                category = na_5,
+                actual_shipped_cases = cases,
+                actual_shipped_lbs = net_pounds_lbs) %>% 
+  dplyr::select(sku, location, mfg_loc, actual_shipped_lbs, actual_shipped_cases) %>% 
+  dplyr::mutate(sku = gsub("-", "", sku),
+                ref = paste0(location, "_", sku),
+                mfg_ref = paste0(mfg_loc, "_", sku)) -> sku_actual
+
+sku_actual %>% 
+  dplyr::group_by(mfg_ref) %>% 
+  dplyr::summarise(actual_shipped_lbs = sum(actual_shipped_lbs),
+                   actual_shipped_cases = sum(actual_shipped_cases)) %>% 
+  dplyr::mutate(actual_shipped_lbs = replace(actual_shipped_lbs, is.na(actual_shipped_lbs), 0),
+                actual_shipped_cases = replace(actual_shipped_cases, is.na(actual_shipped_cases), 0)) -> sku_actual_pivot
+
+
+# combine with forecast x open_order
+
+forecast %>% 
+  dplyr::left_join(open_order_pivot, by = "mfg_ref") %>% 
+  dplyr::left_join(sku_actual_pivot, by = "mfg_ref") %>% 
+  dplyr::mutate(open_order_cases = replace(open_order_cases, is.na(open_order_cases), 0),
+                actual_shipped_cases = replace(actual_shipped_cases, is.na(actual_shipped_cases), 0)) %>% 
+  dplyr::mutate(open_order_net_lbs = replace(open_order_net_lbs, is.na(open_order_net_lbs), 0),
+                actual_shipped_lbs = replace(actual_shipped_lbs, is.na(actual_shipped_lbs), 0),
+                open_order_actual_shipped_lbs = open_order_net_lbs + actual_shipped_lbs,
+                open_order_actual_shipped_cases = open_order_cases + actual_shipped_cases,
+                adjusted_forecast_pounds_lbs = round(adjusted_forecast_pounds_lbs, 0)) -> component_consumption_comparison
+
+
+
+
+
+################################################# Sales Orders ##################################################
+# Input sales orders ----
+# https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/88A31CA8184AD038FB69CD95920E4C61/K53--K46
+
+sales_orders <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Order and Shipped History - Month.xlsx")
+
+sales_orders[-1:-3, ] %>% 
+  dplyr::rename(location = "Visualization 1",
+                mfg_loc = "...2",
+                sku = "...4",
+                description = "...5",
+                original_order_qty = "...6") %>% 
+  dplyr::select(-"...3") %>% 
+  dplyr::mutate(original_order_qty = replace(original_order_qty, is.na(original_order_qty), 0),
+                sku = gsub("-", "", sku),
+                mfg_ref = paste0(mfg_loc, "_", sku)) %>% 
+  readr::type_convert() -> sales_orders
+
+
+sales_orders %>% 
+  dplyr::group_by(mfg_ref) %>% 
+  dplyr::summarise(original_order_qty = sum(original_order_qty)) -> sales_orders_pivot
+
+
+component_consumption_comparison %>% 
+  dplyr::left_join(sales_orders_pivot, by = "mfg_ref") -> component_consumption_comparison
+
+
+# NA to 0
+component_consumption_comparison %>% 
+  dplyr::mutate(original_order_qty = replace(original_order_qty, is.na(original_order_qty), 0)) -> component_consumption_comparison
+
+
+
+################################################ second phase #######################################
+bom %>% 
+  dplyr::select(sku, component, comp_description, quantity_w_scrap) -> bom_2
+
+component_consumption_comparison %>% 
+  dplyr::left_join(bom_2) -> component_consumption_comparison_ver2
+
+
+
+component_consumption_comparison_ver2 %>% 
+  dplyr::mutate(forecasted_oil_qty = adjusted_forecast_cases * quantity_w_scrap,
+                consumption_qty_actual_shipped = open_order_actual_shipped_cases * quantity_w_scrap,
+                consumption_percent_adjusted_actual_shipped = consumption_qty_actual_shipped / forecasted_oil_qty) %>%
+  
+  dplyr::mutate(consumption_qty_sales_order_qty = original_order_qty * quantity_w_scrap,
+                consumption_percent_adjusted_sales_order = consumption_qty_sales_order_qty / forecasted_oil_qty) %>% 
+  
+  
+  dplyr::mutate(consumption_percent_adjusted_actual_shipped = replace(consumption_percent_adjusted_actual_shipped, is.na(consumption_percent_adjusted_actual_shipped) | is.nan(consumption_percent_adjusted_actual_shipped) | is.infinite(consumption_percent_adjusted_actual_shipped), 0)) %>% 
+  dplyr::mutate(consumption_percent_adjusted_actual_shipped = sprintf("%1.2f%%", 100*consumption_percent_adjusted_actual_shipped)) %>% 
+  dplyr::mutate(consumption_percent_adjusted_sales_order = replace(consumption_percent_adjusted_sales_order, is.na(consumption_percent_adjusted_sales_order) | is.nan(consumption_percent_adjusted_sales_order) | is.infinite(consumption_percent_adjusted_sales_order), 0)) %>% 
+  dplyr::mutate(consumption_percent_adjusted_sales_order = sprintf("%1.2f%%", 100*consumption_percent_adjusted_sales_order)) %>% 
+  
+  
+  dplyr::mutate(diff_between_forecast_actual =  forecasted_oil_qty - consumption_qty_actual_shipped,
+                diff_between_forecast_original = forecasted_oil_qty - consumption_qty_sales_order_qty) %>% 
+
+  
+  dplyr::arrange(mfg_ref) %>% 
+  dplyr::relocate(component, .after = group) -> component_consumption_comparison_ver2
+
+
+
+component_consumption_comparison_ver2 %>% 
+  dplyr::filter(mfg_loc != "-1") -> component_consumption_comparison_ver2
+
+#################################################################################################################################################
+#################################################################################################################################################
+
+
+# final touch
+component_consumption_comparison_ver2 %>% 
+  dplyr::mutate(mfg_ref = gsub("_", "-", mfg_ref)) -> component_consumption_comparison_ver2 
+
+# column rename
+component_consumption_comparison_final <- component_consumption_comparison_ver2
+
+component_consumption_comparison_final %>% 
+  dplyr::select(mfg_ref, mfg_loc, sku, sku_description, label, category, platform, group_no, group, component, comp_description,
+                quantity_w_scrap, adjusted_forecast_cases, forecasted_oil_qty, 
+                open_order_cases, actual_shipped_cases, open_order_actual_shipped_cases, 
+                consumption_qty_actual_shipped, consumption_percent_adjusted_actual_shipped,
+                diff_between_forecast_actual, original_order_qty, consumption_qty_sales_order_qty, 
+                consumption_percent_adjusted_sales_order, diff_between_forecast_original) -> component_consumption_comparison_final
+
+
+str(component_consumption_comparison_final)
+
+colnames(component_consumption_comparison_final)[1] <- "mfg ref"
+colnames(component_consumption_comparison_final)[2] <- "mfg Location"
+colnames(component_consumption_comparison_final)[3] <- "SKU (FG)"
+colnames(component_consumption_comparison_final)[4] <- "Description"
+colnames(component_consumption_comparison_final)[5] <- "Label"
+colnames(component_consumption_comparison_final)[6] <- "Category"
+colnames(component_consumption_comparison_final)[7] <- "Platform"
+colnames(component_consumption_comparison_final)[8] <- "Group Code"
+colnames(component_consumption_comparison_final)[9] <- "Group Name"
+colnames(component_consumption_comparison_final)[10] <- "Component"
+colnames(component_consumption_comparison_final)[11] <- "Component Description"
+colnames(component_consumption_comparison_final)[12] <- "Quantity w/Scrap"
+colnames(component_consumption_comparison_final)[13] <- "Adjusted Forecast Cases"
+colnames(component_consumption_comparison_final)[14] <- "Forecasted Oil Qty"
+colnames(component_consumption_comparison_final)[15] <- "Open Order Cases"
+colnames(component_consumption_comparison_final)[16] <- "Actual Shipped Cases"
+colnames(component_consumption_comparison_final)[17] <- "Open Order Cases + Actual Shipped Cases"
+colnames(component_consumption_comparison_final)[18] <- "Consumption Quantity (Open Order + Actual Shipped)"
+colnames(component_consumption_comparison_final)[19] <- "Consumption % (by Adjusted forecast - Open Order + Actual Shipped)"
+colnames(component_consumption_comparison_final)[20] <- "Diff (Forecasted - Actual Shipped)"
+colnames(component_consumption_comparison_final)[21] <- "Original Sales Order Qty (Cases)"
+colnames(component_consumption_comparison_final)[22] <- "Consumption Quantity (Original Sales Order Qty)"
+colnames(component_consumption_comparison_final)[23] <- "Consumption % (by Adjusted forecast - Original Sales Order Qty)"
+colnames(component_consumption_comparison_final)[24] <- "Diff (Forecasted - Original Sales Order)"
+
+
+
+writexl::write_xlsx(component_consumption_comparison_final, "component_consumption_comparison.xlsx")
+
+
+
+
+
+
+
+
+## review the calculation on last column: Difference in Consumption (Adjusted forecast)
+
+### In the discussion with Naseem and Linda
+# 3. Pivot Table view will be in MicroStragegy directly. not from R
