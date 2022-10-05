@@ -48,7 +48,7 @@ forecast %>%
 
 
 # BoM RM to sku ----
-rm_to_sku <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
+rm_to_sku <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/IQR archive/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
                         sheet = "RM to SKU")
 
 rm_to_sku %>% 
@@ -62,7 +62,7 @@ rm_to_sku %>%
 
 
 # BoM Report ----
-bom <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
+bom <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/IQR archive/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
                   sheet = "BoM")
 
 bom[-1:-5, ] -> bom
@@ -125,6 +125,8 @@ open_order %>%
                    open_order_cases = sum(open_order_cases)) %>% 
   dplyr::mutate(open_order_net_lbs = replace(open_order_net_lbs, is.na(open_order_net_lbs), 0),
                 open_order_cases = replace(open_order_cases, is.na(open_order_cases), 0)) -> open_order_pivot
+
+open_order %>% filter(mfg_loc == 623)
 
 
 # Sku Actual Shipped (make sure with your date range)
@@ -311,3 +313,7 @@ writexl::write_xlsx(component_consumption_comparison_final, "component_consumpti
 
 ### In the discussion with Naseem and Linda
 # 3. Pivot Table view will be in MicroStragegy directly. not from R
+
+
+
+# location 622, 624 -> why 623???
