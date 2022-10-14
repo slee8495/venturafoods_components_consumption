@@ -74,10 +74,11 @@ bom %>%
   readr::type_convert() %>% 
   data.frame() %>% 
   dplyr::mutate(ref = gsub("-", "_", ref)) %>% 
-  dplyr::select(ref, comp_ref, business_unit, parent_item_number, comp_number_labor_code, comp_description, quantity_w_scrap) %>% 
+  dplyr::select(ref, comp_ref, business_unit, parent_item_number, comp_number_labor_code, comp_description, quantity_w_scrap, uo_m) %>% 
   dplyr::rename(mfg_loc = business_unit,
                 sku = parent_item_number,
-                component = comp_number_labor_code) %>% 
+                component = comp_number_labor_code,
+                uom = uo_m) %>% 
   dplyr::mutate(mfg_ref = paste0(mfg_loc, "_", sku),
                 mfg_comp_ref = paste0(mfg_loc, "_", component)) %>% 
   dplyr::relocate(ref, comp_ref, mfg_ref, mfg_comp_ref, sku, component, quantity_w_scrap) -> bom
@@ -126,7 +127,7 @@ open_order %>%
   dplyr::mutate(open_order_net_lbs = replace(open_order_net_lbs, is.na(open_order_net_lbs), 0),
                 open_order_cases = replace(open_order_cases, is.na(open_order_cases), 0)) -> open_order_pivot
 
-open_order %>% filter(mfg_loc == 623)
+
 
 
 # Sku Actual Shipped (make sure with your date range)
@@ -217,7 +218,7 @@ component_consumption_comparison %>%
 
 ################################################ second phase #######################################
 bom %>% 
-  dplyr::select(sku, component, comp_description, quantity_w_scrap) -> bom_2
+  dplyr::select(sku, component, comp_description, quantity_w_scrap, uom) -> bom_2
 
 component_consumption_comparison %>% 
   dplyr::left_join(bom_2) -> component_consumption_comparison_ver2
@@ -264,7 +265,7 @@ component_consumption_comparison_final <- component_consumption_comparison_ver2
 
 component_consumption_comparison_final %>% 
   dplyr::select(mfg_ref, mfg_loc, sku, sku_description, label, category, platform, group_no, group, component, comp_description,
-                quantity_w_scrap, adjusted_forecast_cases, forecasted_oil_qty, 
+                quantity_w_scrap, uom, adjusted_forecast_cases, forecasted_oil_qty, 
                 open_order_cases, actual_shipped_cases, open_order_actual_shipped_cases, 
                 consumption_qty_actual_shipped, consumption_percent_adjusted_actual_shipped,
                 diff_between_forecast_actual, original_order_qty, consumption_qty_sales_order_qty, 
@@ -285,18 +286,19 @@ colnames(component_consumption_comparison_final)[9] <- "Group Name"
 colnames(component_consumption_comparison_final)[10] <- "Component"
 colnames(component_consumption_comparison_final)[11] <- "Component Description"
 colnames(component_consumption_comparison_final)[12] <- "Quantity w/Scrap"
-colnames(component_consumption_comparison_final)[13] <- "Adjusted Forecast Cases"
-colnames(component_consumption_comparison_final)[14] <- "Forecasted Oil Qty"
-colnames(component_consumption_comparison_final)[15] <- "Open Order Cases"
-colnames(component_consumption_comparison_final)[16] <- "Actual Shipped Cases"
-colnames(component_consumption_comparison_final)[17] <- "Open Order Cases + Actual Shipped Cases"
-colnames(component_consumption_comparison_final)[18] <- "Consumption Quantity (Open Order + Actual Shipped)"
-colnames(component_consumption_comparison_final)[19] <- "Consumption % (by Adjusted forecast - Open Order + Actual Shipped)"
-colnames(component_consumption_comparison_final)[20] <- "Diff (Forecasted - Actual Shipped)"
-colnames(component_consumption_comparison_final)[21] <- "Original Sales Order Qty (Cases)"
-colnames(component_consumption_comparison_final)[22] <- "Consumption Quantity (Original Sales Order Qty)"
-colnames(component_consumption_comparison_final)[23] <- "Consumption % (by Adjusted forecast - Original Sales Order Qty)"
-colnames(component_consumption_comparison_final)[24] <- "Diff (Forecasted - Original Sales Order)"
+colnames(component_consumption_comparison_final)[13] <- "UoM"
+colnames(component_consumption_comparison_final)[14] <- "Adjusted Forecast Cases"
+colnames(component_consumption_comparison_final)[15] <- "Forecasted Oil Qty"
+colnames(component_consumption_comparison_final)[16] <- "Open Order Cases"
+colnames(component_consumption_comparison_final)[17] <- "Actual Shipped Cases"
+colnames(component_consumption_comparison_final)[18] <- "Open Order Cases + Actual Shipped Cases"
+colnames(component_consumption_comparison_final)[19] <- "Consumption Quantity (Open Order + Actual Shipped)"
+colnames(component_consumption_comparison_final)[20] <- "Consumption % (by Adjusted forecast - Open Order + Actual Shipped)"
+colnames(component_consumption_comparison_final)[21] <- "Diff (Forecasted - Actual Shipped)"
+colnames(component_consumption_comparison_final)[22] <- "Original Sales Order Qty (Cases)"
+colnames(component_consumption_comparison_final)[23] <- "Consumption Quantity (Original Sales Order Qty)"
+colnames(component_consumption_comparison_final)[24] <- "Consumption % (by Adjusted forecast - Original Sales Order Qty)"
+colnames(component_consumption_comparison_final)[25] <- "Diff (Forecasted - Original Sales Order)"
 
 
 
