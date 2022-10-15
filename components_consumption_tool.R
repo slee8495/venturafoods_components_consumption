@@ -74,11 +74,11 @@ bom %>%
   readr::type_convert() %>% 
   data.frame() %>% 
   dplyr::mutate(ref = gsub("-", "_", ref)) %>% 
-  dplyr::select(ref, comp_ref, business_unit, parent_item_number, comp_number_labor_code, comp_description, quantity_w_scrap, uo_m) %>% 
+  dplyr::select(ref, comp_ref, business_unit, parent_item_number, comp_number_labor_code, comp_description, quantity_w_scrap, um) %>% 
   dplyr::rename(mfg_loc = business_unit,
                 sku = parent_item_number,
                 component = comp_number_labor_code,
-                uom = uo_m) %>% 
+                uom = um) %>% 
   dplyr::mutate(mfg_ref = paste0(mfg_loc, "_", sku),
                 mfg_comp_ref = paste0(mfg_loc, "_", component)) %>% 
   dplyr::relocate(ref, comp_ref, mfg_ref, mfg_comp_ref, sku, component, quantity_w_scrap) -> bom
