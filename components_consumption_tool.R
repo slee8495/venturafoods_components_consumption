@@ -11,7 +11,7 @@ library(lubridate)
 
 # Forecast dsx (for lag1, use the first day of the month) ----
 # Make sure to put the date correctly few below ----
-dsx <- read_excel("S:/Global Shared Folders/Large Documents/S&OP/Demand Planning/Demand Planning Team/BI Forecast Backup/2022/DSX Forecast Backup - 2022.08.01.xlsx")
+dsx <- read_excel("S:/Global Shared Folders/Large Documents/S&OP/Demand Planning/Demand Planning Team/BI Forecast Backup/2022/DSX Forecast Backup - 2022.09.02.xlsx")
 
 dsx[-1, ] -> dsx
 colnames(dsx) <- dsx[1, ]
@@ -21,7 +21,7 @@ dsx %>%
   janitor::clean_names() %>% 
   readr::type_convert() %>% 
   data.frame() %>% 
-  dplyr::filter(forecast_month_year_code == 202208) %>%    ############################# MAKE SURE TO PUT THE DATE CORRECTLY ####################### ----
+  dplyr::filter(forecast_month_year_code == 202209) %>%    ############################# MAKE SURE TO PUT THE DATE CORRECTLY ####################### ----
   dplyr::rename(mfg_loc = product_manufacturing_location_code,
                 location = location_no,
                 sku = product_label_sku_code,
@@ -45,6 +45,11 @@ forecast %>%
   dplyr::summarise(adjusted_forecast_cases = sum(adjusted_forecast_cases),
                    adjusted_forecast_pounds_lbs = sum(adjusted_forecast_pounds_lbs)) -> forecast
 
+
+
+forecast %>% 
+  dplyr::filter(mfg_loc != 22) %>% 
+  dplyr::filter(mfg_loc != 16) -> forecast
 
 
 # BoM RM to sku ----
@@ -93,7 +98,7 @@ bom %>%
 
 
 ## open orders ----
-open_order <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Open Orders - 1 Month (11).xlsx")
+open_order <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/9.2022 test/Open Orders - 1 Month (13).xlsx")
 
 open_order[-1, ] -> open_order
 colnames(open_order) <- open_order[1, ]
@@ -131,30 +136,25 @@ open_order %>%
 
 
 # Sku Actual Shipped (make sure with your date range)
-# https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/BBAA886ACF43D82757EE568F91EEB679/K53--K46
+# https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/88A31CA8184AD038FB69CD95920E4C61/W70--K46
 
 ## sku_actual ----
-sku_actual <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Sku Actual Shipped.xlsx")
+sku_actual <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/9.2022 test/Order and Shipped History - Month (2).xlsx")
 
-sku_actual[-1, ] -> sku_actual
+sku_actual[c(-1, -2, -4), ] -> sku_actual
 colnames(sku_actual) <- sku_actual[1, ]
 sku_actual[-1, ] -> sku_actual
 
 sku_actual %>% 
   janitor::clean_names() %>% 
-  readr::type_convert() %>% 
-  dplyr::rename(location_name = na,
-                mfg_loc = product_manufacturing_location,
-                mfg_loc_name = na_2,
-                component = base_product,
-                description = na_3,
-                sku = product_label_sku,
-                category = na_5,
+  readr::type_convert() %>%
+  data.frame() %>% 
+  dplyr::rename(mfg_loc = na_2,
+                sku = na_4,
                 actual_shipped_cases = cases,
                 actual_shipped_lbs = net_pounds_lbs) %>% 
-  dplyr::select(sku, location, mfg_loc, actual_shipped_lbs, actual_shipped_cases) %>% 
+  dplyr::select(sku, mfg_loc, actual_shipped_lbs, actual_shipped_cases) %>% 
   dplyr::mutate(sku = gsub("-", "", sku),
-                ref = paste0(location, "_", sku),
                 mfg_ref = paste0(mfg_loc, "_", sku)) -> sku_actual
 
 sku_actual %>% 
@@ -163,6 +163,7 @@ sku_actual %>%
                    actual_shipped_cases = sum(actual_shipped_cases)) %>% 
   dplyr::mutate(actual_shipped_lbs = replace(actual_shipped_lbs, is.na(actual_shipped_lbs), 0),
                 actual_shipped_cases = replace(actual_shipped_cases, is.na(actual_shipped_cases), 0)) -> sku_actual_pivot
+
 
 
 # combine with forecast x open_order
@@ -186,7 +187,7 @@ forecast %>%
 # Input sales orders ----
 # https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/88A31CA8184AD038FB69CD95920E4C61/K53--K46
 
-sales_orders <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Order and Shipped History - Month.xlsx")
+sales_orders <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/9.2022 test/Order and Shipped History - Month (1).xlsx")
 
 sales_orders[-1:-3, ] %>% 
   dplyr::rename(location = "Visualization 1",
@@ -203,7 +204,8 @@ sales_orders[-1:-3, ] %>%
 
 sales_orders %>% 
   dplyr::group_by(mfg_ref) %>% 
-  dplyr::summarise(original_order_qty = sum(original_order_qty)) -> sales_orders_pivot
+  dplyr::summarise(original_order_qty = sum(original_order_qty)) %>% 
+  dplyr::mutate(original_order_qty = ifelse(original_order_qty < 0, 0, original_order_qty)) -> sales_orders_pivot
 
 
 component_consumption_comparison %>% 
@@ -218,7 +220,7 @@ component_consumption_comparison %>%
 
 ################################################ second phase #######################################
 bom %>% 
-  dplyr::select(sku, component, comp_description, quantity_w_scrap, uom) -> bom_2
+  dplyr::select(mfg_ref, component, comp_description, quantity_w_scrap, uom) -> bom_2
 
 component_consumption_comparison %>% 
   dplyr::left_join(bom_2) -> component_consumption_comparison_ver2
@@ -251,6 +253,10 @@ component_consumption_comparison_ver2 %>%
 
 component_consumption_comparison_ver2 %>% 
   dplyr::filter(mfg_loc != "-1") -> component_consumption_comparison_ver2
+
+
+# Duplicated values delete
+component_consumption_comparison_ver2[!duplicated(component_consumption_comparison_ver2[,c("mfg_ref", "sku", "component", "quantity_w_scrap")]),] -> component_consumption_comparison_ver2
 
 #################################################################################################################################################
 #################################################################################################################################################
