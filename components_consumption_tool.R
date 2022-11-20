@@ -11,7 +11,7 @@ library(lubridate)
 
 # Forecast dsx (for lag1, use the first day of the month) ----
 # Make sure to put the date correctly few below ----
-dsx <- read_excel("S:/Global Shared Folders/Large Documents/S&OP/Demand Planning/Demand Planning Team/BI Forecast Backup/2022/DSX Forecast Backup - 2022.09.02.xlsx")
+dsx <- read_excel("S:/Global Shared Folders/Large Documents/S&OP/Demand Planning/Demand Planning Team/BI Forecast Backup/2022/DSX Forecast Backup - 2022.10.03.xlsx")
 
 dsx[-1, ] -> dsx
 colnames(dsx) <- dsx[1, ]
@@ -21,7 +21,7 @@ dsx %>%
   janitor::clean_names() %>% 
   readr::type_convert() %>% 
   data.frame() %>% 
-  dplyr::filter(forecast_month_year_code == 202209) %>%    ############################# MAKE SURE TO PUT THE DATE CORRECTLY ####################### ----
+  dplyr::filter(forecast_month_year_code == 202210) %>%    ############################# MAKE SURE TO PUT THE DATE CORRECTLY ####################### ----
   dplyr::rename(mfg_loc = product_manufacturing_location_code,
                 location = location_no,
                 sku = product_label_sku_code,
@@ -53,7 +53,7 @@ forecast %>%
 
 
 # BoM RM to sku ----
-rm_to_sku <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/IQR archive/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
+rm_to_sku <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/Raw Material Inventory Health (IQR) - 11.02.22.xlsx", 
                         sheet = "RM to SKU")
 
 rm_to_sku %>% 
@@ -67,7 +67,7 @@ rm_to_sku %>%
 
 
 # BoM Report ----
-bom <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/IQR archive/Raw Material Inventory Health (IQR) - 08.29.22.xlsx", 
+bom <- read_excel("S:/Supply Chain Projects/LOGISTICS/SCP/Cost Saving Reporting/Inventory Days On Hand/Raw Material Inventory Health (IQR) - 11.02.22.xlsx", 
                   sheet = "BoM")
 
 bom[-1:-5, ] -> bom
@@ -98,7 +98,7 @@ bom %>%
 
 
 ## open orders ----
-open_order <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/9.2022 test/Open Orders - 1 Month (13).xlsx")
+open_order <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Oct.2022 Report/Open Orders - 1 Month (14).xlsx")
 
 open_order[-1, ] -> open_order
 colnames(open_order) <- open_order[1, ]
@@ -139,7 +139,7 @@ open_order %>%
 # https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/7D421DDA4D4411DA73B4469771826BD9/W62--K46
 
 ## sku_actual ----
-sku_actual <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Components Consumption/shipped.xlsx")
+sku_actual <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Oct.2022 Report/Order and Shipped History (6).xlsx")
 
 
 sku_actual %>% 
@@ -183,7 +183,7 @@ forecast %>%
 # Input sales orders ----
 # https://edgeanalytics.venturafoods.com/MicroStrategyLibrary/app/DF007F1C11E9B3099BB30080EF7513D2/7D421DDA4D4411DA73B4469771826BD9/W62--K46
 
-sales_orders <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Components Consumption/ordered.xlsx")
+sales_orders <- read_excel("C:/Users/slee/OneDrive - Ventura Foods/Ventura Work/SCE/Project/FY 23/Oil Consumption/Oct.2022 Report/Order and Shipped History (7).xlsx")
 
 sales_orders %>% 
   janitor::clean_names() %>% 
